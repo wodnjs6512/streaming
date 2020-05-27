@@ -2,12 +2,12 @@ import io from 'socket.io-client';
 
 const GATEWAY_CONNECT_TIMEOUT = 5000;
 
+const HOSTNAME = 'http://localhost:5000';
+
 export const serverConnect = () => {
     return new Promise((resolve, reject) => {
-        const client = io(hostname, {
-            path,
+        const client = io(HOSTNAME, {
             secure: true,
-            reconnect: true,
             rejectUnauthorized: false,
             timeout: GATEWAY_CONNECT_TIMEOUT,
             transports: ['websocket'],
@@ -22,15 +22,15 @@ export const serverConnect = () => {
         client.on('disconnect', () => {
             console.log('closed');
         });
-        client.on('connection_error', (error) => {
+        client.on('connection_error', (error: Error) => {
             console.error('connect_error', error);
             reject(error);
         });
-        client.on('connection_timeout', (timeout) => {
+        client.on('connection_timeout', (timeout: any) => {
             console.error('connect_timeout', timeout);
             reject(timeout);
         });
-        client.on('error', (error) => {
+        client.on('error', (error: Error) => {
             console.error('error', error);
             reject(error);
         });

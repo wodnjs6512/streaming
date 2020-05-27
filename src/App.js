@@ -21,7 +21,6 @@ function App() {
         if (!videoUtil) {
             console.log(videoDisplay.current);
             videoUtil = new VideoUtils(videoDisplay.current);
-            videoUtil.init();
         }
     }, []);
 
