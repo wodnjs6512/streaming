@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import styled from '@emotion/styled';
-import VideoUtils from './utils/videoRecordingUtil.ts';
+import VideoUtils from './utils/videoRecordingUtil';
 import './App.css';
 
 const VideoContainer = styled.video`
@@ -11,7 +11,6 @@ const VideoContainer = styled.video`
 `;
 
 let videoUtil = null;
-
 function App() {
     const videoDisplay = useRef(null);
 
@@ -19,7 +18,6 @@ function App() {
 
     useEffect(() => {
         if (!videoUtil) {
-            console.log(videoDisplay.current);
             videoUtil = new VideoUtils(videoDisplay.current);
         }
     }, []);
@@ -27,6 +25,7 @@ function App() {
     const playVideo = () => {
         setIsPlaying(true);
         videoDisplay.current.play();
+        videoUtil.startRecording();
     };
     const stopVideo = () => {
         setIsPlaying(false);
