@@ -10,7 +10,7 @@ class VideoUtils {
         this._VIDEO_HEIGHT = 480;
         this.stream = null;
         this.videoElement = targetFrame;
-        this._audioContext = new AudioContext();
+        this._audioContext = new AudioContext({ sampleRate: 44100 });
         this.socketUtil = new SocketUtils();
         this.socketClient = this.socketUtil.serverConnect();
         this._mediaRecorder = null;
@@ -23,26 +23,73 @@ class VideoUtils {
 
         const streamSrc = this._audioContext.createMediaStreamSource(this.stream);
         const analyserNode = this._audioContext.createAnalyser();
-        const highPassFilter = this._audioContext.createBiquadFilter();
-        const lowshelfFilter = this._audioContext.createBiquadFilter();
-        const highShelfFilter = this._audioContext.createBiquadFilter();
-        const scriptNode = this._audioContext.createScriptProcessor(4096, 1, 1);
+
+        const frequencies = [
+            25,
+            31,
+            40,
+            50,
+            63,
+            80,
+            100,
+            125,
+            160,
+            200,
+            250,
+            315,
+            400,
+            500,
+            630,
+            800,
+            1000,
+            1250,
+            1600,
+            2000,
+            2500,
+            3150,
+            4000,
+            5000,
+            6300,
+            8000,
+            10000,
+            12500,
+            16000,
+            20000,
+        ];
+
+        const filters = frequencies.map((frequency, index, array) => {
+            const filterNode = this._audioContext.createBiquadFilter();
+            filterNode.gain.value = 0.2;
+            filterNode.frequency.setValueAtTime(frequency, this._audioContext.currentTime);
+
+            if (index === 0) {
+                filterNode.type = 'lowshelf';
+            } else if (index === array.length - 1) {
+                filterNode.type = 'highshelf';
+            } else {
+                filterNode.type = 'peaking';
+            }
+            return filterNode;
+        });
+
+        const bandpassFilter = this._audioContext.createBiquadFilter();
+        const scriptNode = this._audioContext.createScriptProcessor();
         const destination = this._audioContext.createMediaStreamDestination();
 
-        highPassFilter.type = 'highpass';
-        highPassFilter.frequency.setValueAtTime(2000, this._audioContext.currentTime);
-
-        lowshelfFilter.type = 'lowshelf';
-        lowshelfFilter.frequency.setValueAtTime(8000, this._audioContext.currentTime);
-
-        highShelfFilter.type = 'highshelf';
-        highShelfFilter.frequency.setValueAtTime(17000, this._audioContext.currentTime);
+        bandpassFilter.type = 'bandpass';
+        bandpassFilter.frequency.setValueAtTime(8000, this._audioContext.currentTime);
+        bandpassFilter.Q.value = 1;
+        bandpassFilter.gain.value = 0.1;
 
         streamSrc.connect(analyserNode);
-        analyserNode.connect(lowshelfFilter);
-        lowshelfFilter.connect(highPassFilter);
-        highPassFilter.connect(highShelfFilter);
-        highShelfFilter.connect(scriptNode);
+        // analyserNode.connect(bandpassFilter);
+        filters.reduce((prev, current) => {
+            prev.connect(current);
+            return current;
+        }, analyserNode);
+        filters[filters.length - 1].connect(scriptNode);
+
+        // bandpassFilter.connect(scriptNode);
         scriptNode.connect(destination);
         scriptNode.onaudioprocess = this._handleScriptProcess(analyserNode);
         // removes audio track
@@ -50,11 +97,8 @@ class VideoUtils {
         this.stream.addTrack(destination.stream.getAudioTracks()[0]);
 
         this._mediaRecorder = new MediaRecorder(this.stream, MEDIA_RECORDER_OPTION);
-        this._mediaRecorder.ondataavailable = function (e) {
-            console.log('HEE HAA');
-            // chunks.push(e.data);
-        };
         this.setupVideoElement();
+        this._mediaRecorder.start();
     }
 
     setupVideoElement() {
@@ -68,10 +112,6 @@ class VideoUtils {
         this.videoElement.playbackRate = 0;
     }
 
-    startRecording() {
-        this._mediaRecorder.start();
-    }
-
     _handleScriptProcess = (analyserNode) => (audioProcessingEvent) => {
         const array = new Uint8Array(analyserNode.frequencyBinCount);
         analyserNode.getByteFrequencyData(array);
@@ -81,11 +121,6 @@ class VideoUtils {
             const inputData = inputBuffer.getChannelData(channel);
             const outputData = outputBuffer.getChannelData(channel);
             for (let sample = 0; sample < inputBuffer.length; sample++) {
-                if (inputData[sample] > -0.0015 && inputData[sample] < 0.0015) {
-                    outputData[sample] = 0;
-                    continue;
-                }
-
                 if (this._currentVolume > 10) {
                     outputData[sample] = inputData[sample];
                 } else if (this._currentVolume > 5) {
@@ -103,7 +138,7 @@ class VideoUtils {
         }
 
         return await navigator.mediaDevices.getUserMedia({
-            audio: { echoCancellation: true, autoGainControl: true, noiseSuppression: true },
+            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
             video: {
                 facingMode: 'user',
                 width: this._VIDEO_WIDTH,

@@ -25,7 +25,6 @@ function App() {
     const playVideo = () => {
         setIsPlaying(true);
         videoDisplay.current.play();
-        videoUtil.startRecording();
     };
     const stopVideo = () => {
         setIsPlaying(false);
