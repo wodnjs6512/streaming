@@ -9,6 +9,7 @@ const VideoContainer = styled.video`
     background: white;
     position: relative;
 `;
+var videoSrc = 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8';
 
 let videoUtil = null;
 
@@ -18,19 +19,35 @@ function App() {
     const [isPlaying, setIsPlaying] = useState(false);
 
     useEffect(() => {
-        if (!videoUtil) {
-            console.log(videoDisplay.current);
-            videoUtil = new VideoUtils(videoDisplay.current);
-        }
+        new Promise((resolve, reject) => {
+            const hlsScript = document.createElement('script');
+            hlsScript.setAttribute('src', '/lib/hls.js');
+            hlsScript.addEventListener('load', (e) => {
+                if (window.Hls.isSupported()) {
+                    window.hls = new window.Hls();
+                }
+
+                resolve();
+            });
+            hlsScript.addEventListener('error', reject);
+            document.body.appendChild(hlsScript);
+
+            if (!videoUtil) {
+                videoUtil = new VideoUtils(videoDisplay.current);
+            }
+        });
     }, []);
 
     const playVideo = () => {
         setIsPlaying(true);
-        videoDisplay.current.play();
+        window.hls.loadSource('/video/chunklist.m3u8');
+        window.hls.attachMedia(videoDisplay.current);
+        window.hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+            var video = document.getElementById('webCamElement').play();
+        });
     };
     const stopVideo = () => {
         setIsPlaying(false);
-        videoDisplay.current.pause();
     };
 
     return (
