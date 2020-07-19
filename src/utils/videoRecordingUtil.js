@@ -1,4 +1,3 @@
-import SocketUtils from './serverConnectionUtil';
 const timeSlice = 3000;
 class VideoUtils {
     // 카메라 입력 해상도
@@ -8,17 +7,16 @@ class VideoUtils {
         this._VIDEO_HEIGHT = 480;
         this.stream = null;
         this.videoElement = targetFrame;
-        this._audioContext = new AudioContext({ sampleRate: 44100 });
-        // this.socketUtil = new SocketUtils();
-        // this.socketClient = this.socketUtil.serverConnect();
         this._mediaRecorder = null;
-
-        // const videoElement: HTMLVideoElement = document.querySelector('#webCamElement');
+        this.isBroadcasting = false;
         this.setUpMediaRecorder();
         this.setupVideoElement();
     }
 
     sendToServer(data, callback) {
+        if (!this.isBroadcasting) {
+            return;
+        }
         var blobData = new Blob([data]);
         var formData = new FormData();
         var url = '/api/upload';
@@ -27,7 +25,7 @@ class VideoUtils {
         xhr.open('POST', url, true);
         xhr.enctype = 'multipart/form-data';
         xhr.onreadystatechange = function (e) {
-            if (xhr.readyState == 4) {
+            if (xhr.readyState === 4) {
                 blobData = null;
                 formData = null;
                 callback();
@@ -45,32 +43,29 @@ class VideoUtils {
                 height: this._VIDEO_HEIGHT,
             },
         });
+
         const options = { mimeType: 'video/webm;codecs=vp9' };
         var mediaRecorder = new MediaRecorder(stream, options);
         mediaRecorder.ondataavailable = (e) => {
-            console.log('dataavailable!');
-
-            if (mediaRecorder.state == 'recording') {
+            if (mediaRecorder.state === 'recording') {
                 mediaRecorder.stop();
                 if (e.data.size > 0) {
-                    this.sendToServer(e.data, function () {
-                        console.log('Upload request!');
-                    });
+                    this.sendToServer(e.data, function () {});
                 }
             }
         };
 
         mediaRecorder.onerror = function (e) {
-            console.log('error occured on recorder', e);
+            // console.log('error occured on recorder', e);
         };
         mediaRecorder.onresume = function () {
-            console.log('onresume');
+            // console.log('onresume');
         };
         mediaRecorder.onstart = function () {
-            console.log('onstart');
+            // console.log('onstart');
         };
         mediaRecorder.onstop = function () {
-            console.log('onstop');
+            // console.log('onstop');
             mediaRecorder.start(timeSlice);
         };
 

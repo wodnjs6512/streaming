@@ -1,7 +1,9 @@
 import React, { useRef, useEffect, useState } from 'react';
 import styled from '@emotion/styled';
-import VideoUtils from './utils/videoRecordingUtil.ts';
+import VideoUtils from './utils/videoRecordingUtil.js';
+import videojs from 'video.js';
 import './App.css';
+import io from 'socket.io-client';
 
 const VideoContainer = styled.video`
     width: 100px;
@@ -9,7 +11,14 @@ const VideoContainer = styled.video`
     background: white;
     position: relative;
 `;
-var videoSrc = 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8';
+
+const OPTIONS = {
+    aspectRatio: '16:9',
+    playbackRates: [0.5, 1, 1.5, 2],
+    responsive: true,
+    height: 10,
+    liveui: true,
+};
 
 let videoUtil = null;
 
@@ -21,38 +30,70 @@ function App() {
     useEffect(() => {
         new Promise((resolve, reject) => {
             const hlsScript = document.createElement('script');
-            hlsScript.setAttribute('src', '/lib/hls.js');
+            hlsScript.setAttribute('src', 'https://cdn.jsdelivr.net/npm/hls.js@latest');
             hlsScript.addEventListener('load', (e) => {
                 if (window.Hls.isSupported()) {
                     window.hls = new window.Hls();
                 }
-
                 resolve();
             });
             hlsScript.addEventListener('error', reject);
             document.body.appendChild(hlsScript);
 
-            if (!videoUtil) {
-                videoUtil = new VideoUtils(videoDisplay.current);
-            }
+            videoUtil = new VideoUtils(videoDisplay.current);
+        });
+        videojs('my-player', OPTIONS, function onPlayerReady() {
+            videojs.log('Your player is ready!');
+
+            // In this context, `this` is the player that was created by Video.js.
+            this.aspectRatio = '4:3';
+            // How about an event listener?
+            this.on('ended', function () {
+                videojs.log('Awww...over so soon?!');
+            });
         });
     }, []);
 
     const playVideo = () => {
         setIsPlaying(true);
-        window.hls.loadSource('/video/chunklist.m3u8');
-        window.hls.attachMedia(videoDisplay.current);
-        window.hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
-            var video = document.getElementById('webCamElement').play();
+        // videoUtil.isBroadcasting = true;
+        const socket = io('https://local.streaming.com', {
+            path: '/ws/chat',
+            reconnect: true,
+            rejectUnauthorized: false,
+            transports: ['websocket'],
+        });
+
+        socket.on('open', () => {
+            console.log('NSASR Voice Server Connected');
+        });
+        socket.on('connect', () => {
+            console.log('socket connected');
         });
     };
     const stopVideo = () => {
         setIsPlaying(false);
+        videoUtil.isBroadcasting = false;
     };
 
     return (
         <div className="App">
             <header className="App-header">
+                <video
+                    id="my-player"
+                    className="video-js"
+                    controls
+                    preload="auto"
+                    poster="//vjs.zencdn.net/v/oceans.png"
+                    data-setup="{}"
+                >
+                    <source src="/video/chunklist.m3u8" type="application/x-mpegURL" />
+
+                    <p className="vjs-no-js">
+                        To view this video please enable JavaScript, and consider upgrading to a web
+                        browser that supports HTML5 video
+                    </p>
+                </video>
                 <div>
                     <VideoContainer id="webCamElement" ref={videoDisplay}></VideoContainer>
                     {!isPlaying && <div onClick={playVideo}>PLAY</div>}
